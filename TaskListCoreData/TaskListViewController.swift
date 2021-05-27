@@ -6,13 +6,27 @@
 //
 
 import UIKit
+import CoreData
 
 class TaskListViewController: UITableViewController {
+    
+    private let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+    
+    private let cellID = "cell"
+    private var taskList: [Task] = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .white
+        tableView.register(UITableViewCell.self, forCellReuseIdentifier: cellID) //зарегистрировать и указать идентификатор для ячейки
         setupNavigationBar()
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+//        print("viewWillAppear")
+        fetchData()
+//        print(taskList)
     }
 
     private func setupNavigationBar() {
@@ -49,7 +63,34 @@ class TaskListViewController: UITableViewController {
     
     @objc private func addNewTask() {
         let newTaskVC = NewTaskViewController()
+        newTaskVC.modalPresentationStyle = .fullScreen
         present(newTaskVC, animated: true)
     }
+    
+    private func fetchData() {
+        let fetchRequest: NSFetchRequest<Task> = Task.fetchRequest()
+        do {
+            taskList = try context.fetch(fetchRequest)
+            tableView.reloadData()
+        } catch let error {
+            print(error.localizedDescription)
+        }
+    } //для восстановления данных нужен метод fetchData, это значит чтобы восстановить данные из базы и нам нужно создать запрос к этой базе. нам надо создать запрос fetchRequest для объектов с типом task, поэтому, мы должны указать тип, который нам нужен. можно настраивать различные параметры сортировки или фильтрации данных для извлечения
 }
 
+// MARK: - Table View Data Source
+extension TaskListViewController {
+    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        taskList.count
+    }
+    
+    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: cellID, for: indexPath)
+        var content = cell.defaultContentConfiguration()
+        let task = taskList[indexPath.row]
+        content.text = task.name
+        print(task.name!)
+        cell.contentConfiguration = content
+        return cell
+    }
+}
