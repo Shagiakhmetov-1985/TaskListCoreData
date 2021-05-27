@@ -20,6 +20,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
     
+    func applicationWillTerminate(_ application: UIApplication) {
+        saveContext() //в случае приложение будет выгружено из памяти, то произойдет вызов метода saveContext() и все, что было изменено в контексте будет сохранено в постоянном хранилище. именно поэтому когда у вас там упадет xcode, когда мы с вами работали и завершили работу, запускаем его снова и все данные, которые там были внесены и они у вас сохраняются. именно поэтому, в операционных системах на маках нет кнопки сохранить
+    }
+    
     // MARK: - Core Data stack
     lazy var persistentContainer: NSPersistentContainer = {
         let container = NSPersistentContainer(name: "TaskListCoreData")

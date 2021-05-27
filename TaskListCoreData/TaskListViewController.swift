@@ -20,13 +20,7 @@ class TaskListViewController: UITableViewController {
         view.backgroundColor = .white
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: cellID) //зарегистрировать и указать идентификатор для ячейки
         setupNavigationBar()
-    }
-    
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-//        print("viewWillAppear")
         fetchData()
-//        print(taskList)
     }
 
     private func setupNavigationBar() {
@@ -62,9 +56,7 @@ class TaskListViewController: UITableViewController {
     }
     
     @objc private func addNewTask() {
-        let newTaskVC = NewTaskViewController()
-        newTaskVC.modalPresentationStyle = .fullScreen
-        present(newTaskVC, animated: true)
+        showAlert(with: "New task", and: "What do you want to do?")
     }
     
     private func fetchData() {
@@ -76,6 +68,37 @@ class TaskListViewController: UITableViewController {
             print(error.localizedDescription)
         }
     } //для восстановления данных нужен метод fetchData, это значит чтобы восстановить данные из базы и нам нужно создать запрос к этой базе. нам надо создать запрос fetchRequest для объектов с типом task, поэтому, мы должны указать тип, который нам нужен. можно настраивать различные параметры сортировки или фильтрации данных для извлечения
+    private func showAlert(with title: String, and message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        let saveAction = UIAlertAction(title: "Save", style: .default) { _ in
+            guard let task = alert.textFields?.first?.text, !task.isEmpty else { return }
+            self.save(task)
+        }
+        let cancelAction = UIAlertAction(title: "Cancel", style: .destructive)
+        alert.addTextField()
+        alert.addAction(saveAction)
+        alert.addAction(cancelAction)
+        present(alert, animated: true)
+    }
+    
+    private func save(_ taskName: String) {
+        guard let entityDescription = NSEntityDescription.entity(forEntityName: "Task", in: context) else { return } //описание сущности, которая содержит все информацию о всех моделях, которые хранятся
+        guard let task = NSManagedObject(entity: entityDescription, insertInto: context) as? Task else { return } //на основе созданного нами объекта уже создаются конкретный экземпляр модели и все экземпляры моделей имеют типа Int
+        task.name = taskName //через этот экземпляр происходит значение свойства name, конкретное внесенное значение, которое пользователь внес в текстовое поле taskTextField
+        taskList.append(task)
+        let cellIndex = IndexPath(row: taskList.count - 1, section: 0)
+        //чтобы добавить ячейку нам нужно знать по какому индексу добавить. чтобы определить индекс и за индекс у нас отвечает соответствующий тип данных, который так называется IndexPath. он определяет инжекс ячеек
+        tableView.insertRows(at: [cellIndex], with: .automatic)
+        
+        //дальше на основе entityDescription создаем конкретный экземпляр модели, task по умолчанию принимает NSManagedObject до нашего нужного типа класса Task и после этого обращаемся к экземпляру модели передаем в свойства модели task.name необходимое значение. любой объект сущности живет в конкретном определенном контексте
+        if context.hasChanges { //если произошли изменения в контекте, то вызываем метод сейв
+            do {
+                try context.save() //все методы, которые связаны с базами данных, сетевыми запросами они выкидывают с try, потому что никто ничего гарантировать никогда не может. поэтому данный метод нужно вызывать через try.
+            } catch let error { //объект ошибки и вывод на консоль, если вдруг возникнет ошибка
+                print(error.localizedDescription)
+            }
+        }
+    }
 }
 
 // MARK: - Table View Data Source
@@ -89,7 +112,6 @@ extension TaskListViewController {
         var content = cell.defaultContentConfiguration()
         let task = taskList[indexPath.row]
         content.text = task.name
-        print(task.name!)
         cell.contentConfiguration = content
         return cell
     }
