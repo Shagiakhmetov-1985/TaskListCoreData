@@ -4,7 +4,7 @@
 //
 //  Created by Marat Shagiakhmetov on 28.05.2021.
 //
-
+import UIKit
 import CoreData
 
 class StorageManager {
@@ -26,6 +26,10 @@ class StorageManager {
     
     private init() {
         viewContext = persistentContainer.viewContext
+    }
+    
+    func applicationWillTerminate(_ application: UIApplication) {
+        saveContext() //в случае приложение будет выгружено из памяти, то произойдет вызов метода saveContext() и все, что было изменено в контексте будет сохранено в постоянном хранилище. именно поэтому когда у вас там упадет xcode, когда мы с вами работали и завершили работу, запускаем его снова и все данные, которые там были внесены и они у вас сохраняются. именно поэтому, в операционных системах на маках нет кнопки сохранить
     }
     
     // MARK: - Public Methods
