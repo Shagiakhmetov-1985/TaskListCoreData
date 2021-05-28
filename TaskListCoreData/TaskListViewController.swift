@@ -10,7 +10,7 @@ import CoreData
 
 class TaskListViewController: UITableViewController {
     
-    private let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+//    private let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
     
     private let cellID = "cell"
     private var taskList: [Task] = []
@@ -20,7 +20,7 @@ class TaskListViewController: UITableViewController {
         view.backgroundColor = .white
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: cellID) //зарегистрировать и указать идентификатор для ячейки
         setupNavigationBar()
-        fetchData()
+        getData()
     }
 
     private func setupNavigationBar() {
@@ -56,49 +56,28 @@ class TaskListViewController: UITableViewController {
     }
     
     @objc private func addNewTask() {
-        showAlert(with: "New task", and: "What do you want to do?")
+        showAlert()
     }
     
-    private func fetchData() {
-        let fetchRequest: NSFetchRequest<Task> = Task.fetchRequest()
-        do {
-            taskList = try context.fetch(fetchRequest)
-            tableView.reloadData()
-        } catch let error {
-            print(error.localizedDescription)
+    private func save(task: String) {
+        StorageManager.shared.save(task) { task in
+            self.taskList.append(task)
+            self.tableView.insertRows(
+                at: [IndexPath(row: self.taskList.count - 1, section: 0)],
+                with: .automatic)
         }
-    } //для восстановления данных нужен метод fetchData, это значит чтобы восстановить данные из базы и нам нужно создать запрос к этой базе. нам надо создать запрос fetchRequest для объектов с типом task, поэтому, мы должны указать тип, который нам нужен. можно настраивать различные параметры сортировки или фильтрации данных для извлечения
-    private func showAlert(with title: String, and message: String) {
-        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        let saveAction = UIAlertAction(title: "Save", style: .default) { _ in
-            guard let task = alert.textFields?.first?.text, !task.isEmpty else { return }
-            self.save(task)
-        }
-        let cancelAction = UIAlertAction(title: "Cancel", style: .destructive)
-        alert.addTextField()
-        alert.addAction(saveAction)
-        alert.addAction(cancelAction)
-        present(alert, animated: true)
     }
     
-    private func save(_ taskName: String) {
-        guard let entityDescription = NSEntityDescription.entity(forEntityName: "Task", in: context) else { return } //описание сущности, которая содержит все информацию о всех моделях, которые хранятся
-        guard let task = NSManagedObject(entity: entityDescription, insertInto: context) as? Task else { return } //на основе созданного нами объекта уже создаются конкретный экземпляр модели и все экземпляры моделей имеют типа Int
-        task.name = taskName //через этот экземпляр происходит значение свойства name, конкретное внесенное значение, которое пользователь внес в текстовое поле taskTextField
-        taskList.append(task)
-        let cellIndex = IndexPath(row: taskList.count - 1, section: 0)
-        //чтобы добавить ячейку нам нужно знать по какому индексу добавить. чтобы определить индекс и за индекс у нас отвечает соответствующий тип данных, который так называется IndexPath. он определяет инжекс ячеек
-        tableView.insertRows(at: [cellIndex], with: .automatic)
-        
-        //дальше на основе entityDescription создаем конкретный экземпляр модели, task по умолчанию принимает NSManagedObject до нашего нужного типа класса Task и после этого обращаемся к экземпляру модели передаем в свойства модели task.name необходимое значение. любой объект сущности живет в конкретном определенном контексте
-        if context.hasChanges { //если произошли изменения в контекте, то вызываем метод сейв
-            do {
-                try context.save() //все методы, которые связаны с базами данных, сетевыми запросами они выкидывают с try, потому что никто ничего гарантировать никогда не может. поэтому данный метод нужно вызывать через try.
-            } catch let error { //объект ошибки и вывод на консоль, если вдруг возникнет ошибка
+    private func getData() {
+        StorageManager.shared.fetchData { result in
+            switch result {
+            case .success(let tasks):
+                self.taskList = tasks
+            case .failure(let error):
                 print(error.localizedDescription)
             }
         }
-    }
+    } //в блоке замыкания объект типа result, это не какой то массив task, это именно блок. но этот тип с перечислением. в случае успеха (success), то нам вернет кейс массив задач. мы просто берем этот массив и передаем в свойства нашего класса. если будет ошибка, то мы там можем отобразить alert controller, написать пользователю, что типа простите и приходите в следующий раз
 }
 
 // MARK: - Table View Data Source
@@ -114,5 +93,53 @@ extension TaskListViewController {
         content.text = task.name
         cell.contentConfiguration = content
         return cell
+    }
+}
+// MARK: - UITable View Delegate
+extension TaskListViewController {
+    //Edit task
+    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        let task = taskList[indexPath.row]
+        showAlert(task: task) {
+            tableView.reloadRows(at: [indexPath], with: .automatic)
+        }
+    }
+    
+    //Delete task
+    override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
+        let task = taskList[indexPath.row]
+        
+        if editingStyle == .delete {
+            taskList.remove(at: indexPath.row)
+            tableView.deleteRows(at: [indexPath], with: .automatic)
+            StorageManager.shared.delete(task)
+        }
+    }
+}
+
+// MARK: - Alert Controller
+extension TaskListViewController {
+    
+    private func showAlert(task: Task? = nil, completion: (() -> Void)? = nil) {
+        
+        let title = task != nil ? "Update Task" : "New Task"
+        
+        let alert = AlertController(
+            title: title,
+            message: "What do you want to do",
+            preferredStyle: .alert
+        )
+        
+        alert.action(task: task) { taskName in
+            if let task = task, let completion = completion {
+                StorageManager.shared.edit(task, newName: taskName)
+                completion() //нужен чтобы внутри блока обновить интерфейс
+            } else {
+                self.save(task: taskName)
+            }
+        }
+        
+        present(alert, animated: true)
     }
 }
